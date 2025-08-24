@@ -1,9 +1,9 @@
-﻿using System;
-using System.Collections.Generic;
-using Elements.Core;
+﻿using Elements.Core;
 using FrooxEngine;
-using HarmonyLib;
 using ResoniteModLoader;
+using System;
+using System.Collections.Generic;
+using System.Diagnostics.Metrics;
 
 namespace ProjectBabbleResonite;
 
@@ -22,7 +22,22 @@ public class BabbleResonite : ResoniteMod
     {
         _config = GetConfiguration();
         Engine.Current.OnShutdown += () => _babbleOsc.Teardown();
-        new Harmony("net.plyshka.ProjectBabbleResonite").PatchAll();
+
+        Engine.Current.RunPostInit(() =>
+        {
+            try
+            {
+                _babbleOsc = new BabbleOsc(_config.GetValue(OscPort));
+                var gen = new ProjectBabbleInterface();
+                Engine.Current.InputInterface.RegisterInputDriver(gen);
+            }
+            catch (Exception e)
+            {
+                Warn("Module failed to initialize.");
+                Warn(e.ToString());
+            }
+        });
+
     }
 
     [AutoRegisterConfigKey]
@@ -30,26 +45,6 @@ public class BabbleResonite : ResoniteMod
 
     [AutoRegisterConfigKey]
     private static readonly ModConfigurationKey<int> OscPort = new("osc_port", "Babble OSC port", () => 8888);
-
-    [HarmonyPatch(typeof(InputInterface), MethodType.Constructor)]
-    [HarmonyPatch(new[] { typeof(Engine) })]
-    public class InputInterfaceCtorPatch
-    {
-        public static void Postfix(InputInterface __instance)
-        {
-            try
-            {
-                _babbleOsc = new BabbleOsc(_config.GetValue(OscPort));
-                var gen = new ProjectBabbleInterface();
-                __instance.RegisterInputDriver(gen);
-            }
-            catch (Exception e)
-            {
-                Warn("Module failed to initialize.");
-                Warn(e.ToString());
-            }
-        }
-    }
 
     private class ProjectBabbleInterface : IInputDriver
     {
